@@ -1,24 +1,3 @@
-/*
-----------------------------------------------------------------------------
-This file is part of MaDCaT.
-Copyright (C) 2012 Gevorg Grigoryan (see README)
-MaDCaT: http://www.grigoryanlab.org/madcat/
-
-MaDCaT is free software: you can redistribute it and/or modify it under
-the terms of the GNU Lesser General Public License as published by the
-Free Software Foundation, either version 3 of the License, or (at your
-option) any later version.
-
-MaDCaT is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
-License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with MaDCaT.  If not, see <http://www.gnu.org/licenses/>.
-----------------------------------------------------------------------------
-*/
-
 #include <iostream>
 #include <cstdlib>
 #include <stdlib.h>
@@ -27,6 +6,7 @@ along with MaDCaT.  If not, see <http://www.gnu.org/licenses/>.
 #include <getopt.h>
 #include <map>
 #include <iomanip>
+#include <unistd.h>
 
 #include "AtomContainer.h"
 #include "System.h"
@@ -118,7 +98,7 @@ class nnclass {
     double getYHigh() { return yhi; }
     double getZHigh() { return zhi; }
     int pointSize() { return pointList.size(); }
-    CartesianPoint& getPoint(int i) { return pointList[i]; }
+    CartesianPoint& getPoint(int i) { return *(pointList[i]); }
 
     void reinitBuckets(int _N) {
       N = _N;
@@ -138,7 +118,7 @@ class nnclass {
       pointBucket(&p, &i, &j, &k);
       if ((i < 0) || (j < 0) || (k < 0) || (i > N-1) || (j > N-1) || (k > N-1)) { cout << "Error: point " << p << " out of range for nnclass object!\n"; exit(-1); }
       buckets[i][j][k].push_back(pair<CartesianPoint*, int>(&p, tag));
-      pointList.push_back(p);
+      pointList.push_back(&p);
     }
     
     void pointBucket(CartesianPoint* p, int* i, int* j, int* k) {
@@ -201,7 +181,7 @@ class nnclass {
     int N; // dimension of bucket list is N x N x N
     double xlo, ylo, zlo, xhi, yhi, zhi;
     vector<vector<vector<vector<pair<CartesianPoint*, int> > > > > buckets;
-    vector<CartesianPoint> pointList;
+    vector<CartesianPoint*> pointList;
 };
 
 class rotamer {
@@ -278,7 +258,7 @@ string option(string opt, string mes, int w, int p1, int p2) {
 
 void usage() {
   int w = 80, p1 = 3, p2 = p1+8;
-  cout << endl << option("", "Creates distance map(s) for use with MaDCaT (as either database or query maps) from input PDB file(s). Options:", w, 0, 0) << endl;
+  cout << endl << option("", "Identifies inter-positional contacts and environment information from input PDB file(s). Options:", w, 0, 0) << endl;
   cout << option("--p", "input PDB file.", w, p1, p2) << endl;
   cout << option("--pL", "a file with a list of PDB files. Either --p or --pL must be given.", w, p1, p2) << endl;
   cout << option("--o", "output file name for writing contacts. If not given, will write to standard output.", w, p1, p2) << endl;
@@ -579,6 +559,7 @@ void filterRotamers(System& _sys, options& _opt, vector<int>& resIndex, vector<v
         else { ratoms.push_back(new Atom(atomId)); ratoms.back()->setHasCoordinates(false); }
       }
       Residue tmpres(ratoms, aaNames[j], posi.getResidueNumber(), posi.getResidueIcode());
+      ratoms.deletePointers(); // Residue copies atoms, so need to delete the original array
       posi.addIdentity(tmpres);
       posi.setActiveIdentity(aaNames[j]);
       if (!sysRot.loadRotamers(&posi, aaNames[j], sysRot.getRotamerLibrary()->size("", aaNames[j]), "", false)) {
@@ -834,7 +815,7 @@ int main(int argc, char *argv[]) {
 
     // -- write out the crowdedness parameter
     for (int i = 0; i < fractionPruned.size(); i++) {
-      out << "crowd  \t" << S.getPosition(resIndex[i]).getPositionId() << "\t" << std::setprecision(6) << std::fixed << fractionPruned[i] << endl;
+      out << "crwdnes\t" << S.getPosition(resIndex[i]).getPositionId() << "\t" << std::setprecision(6) << std::fixed << fractionPruned[i] << endl;
     }
 
     // --- free near-neighbor structures if was dealing with contact probability maps
